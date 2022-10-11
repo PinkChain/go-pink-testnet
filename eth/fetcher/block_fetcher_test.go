@@ -36,14 +36,10 @@ import (
 )
 
 var (
-	testdb      = rawdb.NewMemoryDatabase()
-	testKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	testAddress = crypto.PubkeyToAddress(testKey.PublicKey)
-	gspec       = core.Genesis{
-		Alloc:   core.GenesisAlloc{testAddress: {Balance: big.NewInt(1000000000000000)}},
-		BaseFee: big.NewInt(params.InitialBaseFee),
-	}
-	genesis      = gspec.MustCommit(testdb)
+	testdb       = rawdb.NewMemoryDatabase()
+	testKey, _   = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	testAddress  = crypto.PubkeyToAddress(testKey.PublicKey)
+	genesis      = core.GenesisBlockForTesting(testdb, testAddress, big.NewInt(1000000000000000))
 	unknownBlock = types.NewBlock(&types.Header{GasLimit: params.GenesisGasLimit, BaseFee: big.NewInt(params.InitialBaseFee)}, nil, nil, nil, trie.NewStackTrie(nil))
 )
 
@@ -368,7 +364,6 @@ func testSequentialAnnouncements(t *testing.T, light bool) {
 	hashes, blocks := makeChain(targetBlocks, 0, genesis)
 
 	tester := newTester(light)
-	defer tester.fetcher.Stop()
 	headerFetcher := tester.makeHeaderFetcher("valid", blocks, -gatherSlack)
 	bodyFetcher := tester.makeBodyFetcher("valid", blocks, 0)
 
@@ -748,7 +743,7 @@ func testInvalidNumberAnnouncement(t *testing.T, light bool) {
 	badBodyFetcher := tester.makeBodyFetcher("bad", blocks, 0)
 
 	imported := make(chan interface{})
-	announced := make(chan interface{}, 2)
+	announced := make(chan interface{})
 	tester.fetcher.importedHook = func(header *types.Header, block *types.Block) {
 		if light {
 			if header == nil {
@@ -811,7 +806,6 @@ func TestEmptyBlockShortCircuit(t *testing.T) {
 	hashes, blocks := makeChain(32, 0, genesis)
 
 	tester := newTester(false)
-	defer tester.fetcher.Stop()
 	headerFetcher := tester.makeHeaderFetcher("valid", blocks, -gatherSlack)
 	bodyFetcher := tester.makeBodyFetcher("valid", blocks, 0)
 

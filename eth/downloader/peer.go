@@ -237,7 +237,6 @@ func (ps *peerSet) Register(p *peerConnection) error {
 	}
 	p.rates = msgrate.NewTracker(ps.rates.MeanCapacities(), ps.rates.MedianRoundTrip())
 	if err := ps.rates.Track(p.id, p.rates); err != nil {
-		ps.lock.Unlock()
 		return err
 	}
 	ps.peers[p.id] = p
@@ -295,19 +294,19 @@ func (ps *peerSet) AllPeers() []*peerConnection {
 // peerCapacitySort implements sort.Interface.
 // It sorts peer connections by capacity (descending).
 type peerCapacitySort struct {
-	peers []*peerConnection
-	caps  []int
+	p  []*peerConnection
+	tp []int
 }
 
 func (ps *peerCapacitySort) Len() int {
-	return len(ps.peers)
+	return len(ps.p)
 }
 
 func (ps *peerCapacitySort) Less(i, j int) bool {
-	return ps.caps[i] > ps.caps[j]
+	return ps.tp[i] > ps.tp[j]
 }
 
 func (ps *peerCapacitySort) Swap(i, j int) {
-	ps.peers[i], ps.peers[j] = ps.peers[j], ps.peers[i]
-	ps.caps[i], ps.caps[j] = ps.caps[j], ps.caps[i]
+	ps.p[i], ps.p[j] = ps.p[j], ps.p[i]
+	ps.tp[i], ps.tp[j] = ps.tp[j], ps.tp[i]
 }

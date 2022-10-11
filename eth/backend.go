@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"math/big"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -40,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
@@ -92,7 +93,7 @@ type Ethereum struct {
 	etherbase common.Address
 
 	networkID     uint64
-	netRPCService *ethapi.NetAPI
+	netRPCService *ethapi.PublicNetAPI
 
 	p2pServer *p2p.Server
 
@@ -135,17 +136,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if err != nil {
 		return nil, err
 	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.OverrideTerminalTotalDifficulty, config.OverrideTerminalTotalDifficultyPassed)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.OverrideArrowGlacier, config.OverrideTerminalTotalDifficulty)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
-	log.Info("")
-	log.Info(strings.Repeat("-", 153))
-	for _, line := range strings.Split(chainConfig.String(), "\n") {
-		log.Info(line)
-	}
-	log.Info(strings.Repeat("-", 153))
-	log.Info("")
+	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
 		log.Error("Failed to recover state", "error", err)
@@ -225,21 +220,21 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		checkpoint = params.TrustedCheckpoints[genesisHash]
 	}
 	if eth.handler, err = newHandler(&handlerConfig{
-		Database:       chainDb,
-		Chain:          eth.blockchain,
-		TxPool:         eth.txPool,
-		Merger:         merger,
-		Network:        config.NetworkId,
-		Sync:           config.SyncMode,
-		BloomCache:     uint64(cacheLimit),
-		EventMux:       eth.eventMux,
-		Checkpoint:     checkpoint,
-		RequiredBlocks: config.RequiredBlocks,
+		Database:   chainDb,
+		Chain:      eth.blockchain,
+		TxPool:     eth.txPool,
+		Merger:     merger,
+		Network:    config.NetworkId,
+		Sync:       config.SyncMode,
+		BloomCache: uint64(cacheLimit),
+		EventMux:   eth.eventMux,
+		Checkpoint: checkpoint,
+		Whitelist:  config.Whitelist,
 	}); err != nil {
 		return nil, err
 	}
 
-	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
+	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, merger)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -264,7 +259,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 
 	// Start the RPC service
-	eth.netRPCService = ethapi.NewNetAPI(eth.p2pServer, config.NetworkId)
+	eth.netRPCService = ethapi.NewPublicNetAPI(eth.p2pServer, config.NetworkId)
 
 	// Register the backend on the node
 	stack.RegisterAPIs(eth.APIs())
@@ -306,22 +301,47 @@ func (s *Ethereum) APIs() []rpc.API {
 	return append(apis, []rpc.API{
 		{
 			Namespace: "eth",
-			Service:   NewEthereumAPI(s),
-		}, {
-			Namespace: "miner",
-			Service:   NewMinerAPI(s),
+			Version:   "1.0",
+			Service:   NewPublicEthereumAPI(s),
+			Public:    true,
 		}, {
 			Namespace: "eth",
-			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
+			Version:   "1.0",
+			Service:   NewPublicMinerAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
+			Public:    true,
+		}, {
+			Namespace: "miner",
+			Version:   "1.0",
+			Service:   NewPrivateMinerAPI(s),
+			Public:    false,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, 5*time.Minute),
+			Public:    true,
 		}, {
 			Namespace: "admin",
-			Service:   NewAdminAPI(s),
+			Version:   "1.0",
+			Service:   NewPrivateAdminAPI(s),
 		}, {
 			Namespace: "debug",
-			Service:   NewDebugAPI(s),
+			Version:   "1.0",
+			Service:   NewPublicDebugAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   NewPrivateDebugAPI(s),
 		}, {
 			Namespace: "net",
+			Version:   "1.0",
 			Service:   s.netRPCService,
+			Public:    true,
 		},
 	}...)
 }

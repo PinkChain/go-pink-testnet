@@ -37,12 +37,7 @@ var (
 	testKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	testAddress = crypto.PubkeyToAddress(testKey.PublicKey)
 	testDB      = rawdb.NewMemoryDatabase()
-
-	testGspec = core.Genesis{
-		Alloc:   core.GenesisAlloc{testAddress: {Balance: big.NewInt(1000000000000000)}},
-		BaseFee: big.NewInt(params.InitialBaseFee),
-	}
-	testGenesis = testGspec.MustCommit(testDB)
+	testGenesis = core.GenesisBlockForTesting(testDB, testAddress, big.NewInt(1000000000000000))
 )
 
 // The common prefix of all test chains:
@@ -217,7 +212,7 @@ func newTestBlockchain(blocks []*types.Block) *core.BlockChain {
 			panic("Requested chain generation outside of init")
 		}
 		db := rawdb.NewMemoryDatabase()
-		testGspec.MustCommit(db)
+		core.GenesisBlockForTesting(db, testAddress, big.NewInt(1000000000000000))
 
 		chain, err := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil)
 		if err != nil {

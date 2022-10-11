@@ -54,7 +54,6 @@ var (
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	berlinInstructionSet           = newBerlinInstructionSet()
 	londonInstructionSet           = newLondonInstructionSet()
-	mergeInstructionSet            = newMergeInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -63,7 +62,7 @@ type JumpTable [256]*operation
 func validate(jt JumpTable) JumpTable {
 	for i, op := range jt {
 		if op == nil {
-			panic(fmt.Sprintf("op %#x is not set", i))
+			panic(fmt.Sprintf("op 0x%x is not set", i))
 		}
 		// The interpreter has an assumption that if the memorySize function is
 		// set, then the dynamicGas function is also set. This is a somewhat
@@ -76,17 +75,6 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
-}
-
-func newMergeInstructionSet() JumpTable {
-	instructionSet := newLondonInstructionSet()
-	instructionSet[RANDOM] = &operation{
-		execute:     opRandom,
-		constantGas: GasQuickStep,
-		minStack:    minStack(0, 1),
-		maxStack:    maxStack(0, 1),
-	}
-	return validate(instructionSet)
 }
 
 // newLondonInstructionSet returns the frontier, homestead, byzantium,
@@ -198,6 +186,7 @@ func newSpuriousDragonInstructionSet() JumpTable {
 	instructionSet := newTangerineWhistleInstructionSet()
 	instructionSet[EXP].dynamicGas = gasExpEIP158
 	return validate(instructionSet)
+
 }
 
 // EIP 150 a.k.a Tangerine Whistle
