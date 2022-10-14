@@ -1,18 +1,18 @@
 // Copyright 2020 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// This file is part of go-ethereum.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
+// go-ethereum is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
+// GNU General Public License for more details.
 //
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package t8ntool
 
@@ -63,10 +63,11 @@ type ommer struct {
 	Address common.Address `json:"address"`
 }
 
-//go:generate gencodec -type stEnv -field-override stEnvMarshaling -out gen_stenv.go
+//go:generate go run github.com/fjl/gencodec -type stEnv -field-override stEnvMarshaling -out gen_stenv.go
 type stEnv struct {
 	Coinbase         common.Address                      `json:"currentCoinbase"   gencodec:"required"`
 	Difficulty       *big.Int                            `json:"currentDifficulty"`
+	Random           *big.Int                            `json:"currentRandom"`
 	ParentDifficulty *big.Int                            `json:"parentDifficulty"`
 	GasLimit         uint64                              `json:"currentGasLimit"   gencodec:"required"`
 	Number           uint64                              `json:"currentNumber"     gencodec:"required"`
@@ -81,6 +82,7 @@ type stEnv struct {
 type stEnvMarshaling struct {
 	Coinbase         common.UnprefixedAddress
 	Difficulty       *math.HexOrDecimal256
+	Random           *math.HexOrDecimal256
 	ParentDifficulty *math.HexOrDecimal256
 	GasLimit         math.HexOrDecimal64
 	Number           math.HexOrDecimal64
@@ -138,6 +140,11 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 	// If currentBaseFee is defined, add it to the vmContext.
 	if pre.Env.BaseFee != nil {
 		vmContext.BaseFee = new(big.Int).Set(pre.Env.BaseFee)
+	}
+	// If random is defined, add it to the vmContext.
+	if pre.Env.Random != nil {
+		rnd := common.BigToHash(pre.Env.Random)
+		vmContext.Random = &rnd
 	}
 	// If DAO is supported/enabled, we need to handle it here. In geth 'proper', it's
 	// done in StateProcessor.Process(block, ...), right before transactions are applied.
