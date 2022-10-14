@@ -22,9 +22,9 @@ import (
 
 const (
 	VersionMajor = 1        // Major version component of the current release
-	VersionMinor = 10       // Minor version component of the current release
-	VersionPatch = 15       // Patch version component of the current release
-	VersionMeta  = "stable" // Version metadata to append to the version string
+	VersionMinor = 1       // Minor version component of the current release
+	VersionPatch = 2       // Patch version component of the current release
+	VersionMeta  = "pinktestnet" // Version metadata to append to the version string
 )
 
 // Version holds the textual version string.
